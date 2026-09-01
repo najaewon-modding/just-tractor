@@ -1,5 +1,6 @@
 package net.njw.justtractor.entity;
 
+import net.minecraft.network.chat.Component;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
@@ -8,21 +9,27 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.SimpleContainer;
+import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.HasCustomInventoryScreen;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.MoverType;
 import net.minecraft.world.entity.player.Input;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.ChestMenu;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.Vec3;
 
-public final class TractorEntity extends Entity {
+public final class TractorEntity extends Entity implements HasCustomInventoryScreen {
     private static final EntityDataAccessor<Float> DATA_WHEEL_ROTATION = SynchedEntityData.defineId(TractorEntity.class, EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Float> DATA_STEERING_ANGLE = SynchedEntityData.defineId(TractorEntity.class, EntityDataSerializers.FLOAT);
+    private static final int INVENTORY_SIZE = 27;
     private static final double MAX_FORWARD_SPEED = 0.20;
     private static final double MAX_REVERSE_SPEED = 0.10;
     private static final double ACCELERATION = 0.012;
@@ -32,6 +39,14 @@ public final class TractorEntity extends Entity {
     private static final float STEERING_SPEED = 0.08F;
     private static final double REAR_WHEEL_RADIUS = 9.0 / 16.0;
     private static final double GRAVITY = 0.08;
+
+    private final SimpleContainer inventory = new SimpleContainer(INVENTORY_SIZE) {
+        @Override
+        public boolean stillValid(Player player) {
+            return !TractorEntity.this.isRemoved() && TractorEntity.this.getControllingPassenger() == player;
+        }
+    };
+
     private double currentSpeed;
     private float currentSteeringAngle;
     private float localWheelRotation;
@@ -53,10 +68,13 @@ public final class TractorEntity extends Entity {
 
     @Override
     protected void readAdditionalSaveData(ValueInput input) {
+        this.inventory.clearContent();
+        this.inventory.fromItemList(input.listOrEmpty("Inventory", ItemStack.CODEC));
     }
 
     @Override
     protected void addAdditionalSaveData(ValueOutput output) {
+        this.inventory.storeAsItemList(output.list("Inventory", ItemStack.CODEC));
     }
 
     @Override
@@ -71,21 +89,27 @@ public final class TractorEntity extends Entity {
     }
 
     @Override
+    public void openCustomInventoryScreen(Player player) {
+        if (!(player instanceof ServerPlayer serverPlayer) || this.getControllingPassenger() != player) return;
+        serverPlayer.openMenu(new SimpleMenuProvider((containerId, playerInventory, menuPlayer) -> ChestMenu.threeRows(containerId, playerInventory, this.inventory), Component.literal("Tractor")));
+    }
+
+    @Override
     public void tick() {
         super.tick();
 
         if (this.level().isClientSide()) {
-            if (this.localControl && this.getControllingPassenger() != null) {
-                tickControlledMovement();
-            } else {
-                this.localControl = false;
-            }
-
+            if (this.localControl && this.getControllingPassenger() != null) tickControlledMovement();
+            else this.localControl = false;
             return;
         }
 
         if (this.getControllingPassenger() instanceof ServerPlayer player) {
             updateServerAnimation(player.getLastClientInput());
+
+            if (Math.abs(this.currentSpeed) > 0.01) {
+                TractorHarvester.harvest(this, (ServerLevel)this.level());
+            }
         } else {
             this.currentSpeed = 0.0;
             this.currentSteeringAngle = approach(this.currentSteeringAngle, 0.0F, STEERING_SPEED);
@@ -95,10 +119,7 @@ public final class TractorEntity extends Entity {
     }
 
     public void controlFromClient(Input input) {
-        if (!this.level().isClientSide()) {
-            return;
-        }
-
+        if (!this.level().isClientSide()) return;
         this.clientForward = input.forward();
         this.clientBackward = input.backward();
         this.clientLeft = input.left();
@@ -109,36 +130,17 @@ public final class TractorEntity extends Entity {
     private void tickControlledMovement() {
         double targetSpeed = getTargetSpeed(this.clientForward, this.clientBackward);
         double acceleration = targetSpeed == 0.0 ? DECELERATION : ACCELERATION;
-
         this.currentSpeed = approach(this.currentSpeed, targetSpeed, acceleration);
 
         float steeringInput = getSteeringInput(this.clientLeft, this.clientRight);
         float targetSteeringAngle = steeringInput * MAX_STEERING_ANGLE;
-
-        this.currentSteeringAngle = approach(
-                this.currentSteeringAngle,
-                targetSteeringAngle,
-                STEERING_SPEED
-        );
+        this.currentSteeringAngle = approach(this.currentSteeringAngle, targetSteeringAngle, STEERING_SPEED);
 
         if (Math.abs(this.currentSpeed) > 0.001 && Math.abs(this.currentSteeringAngle) > 0.001F) {
-            float speedRatio = (float) Math.min(
-                    Math.abs(this.currentSpeed) / MAX_FORWARD_SPEED,
-                    1.0
-            );
-
+            float speedRatio = (float)Math.min(Math.abs(this.currentSpeed) / MAX_FORWARD_SPEED, 1.0);
             float reverseFactor = this.currentSpeed >= 0.0 ? 1.0F : -1.0F;
             float steeringRatio = this.currentSteeringAngle / MAX_STEERING_ANGLE;
-
-            this.setYRot(
-                    Mth.wrapDegrees(
-                            this.getYRot()
-                                    + steeringRatio
-                                    * TURN_SPEED
-                                    * speedRatio
-                                    * reverseFactor
-                    )
-            );
+            this.setYRot(Mth.wrapDegrees(this.getYRot() + steeringRatio * TURN_SPEED * speedRatio * reverseFactor));
         }
 
         double radians = Math.toRadians(this.getYRot());
@@ -148,10 +150,6 @@ public final class TractorEntity extends Entity {
 
         this.setDeltaMovement(velocityX, velocityY, velocityZ);
         this.applyGravity();
-
-        double oldX = this.getX();
-        double oldZ = this.getZ();
-
         this.move(MoverType.SELF, this.getDeltaMovement());
 
         Vec3 movement = this.getDeltaMovement();
@@ -159,27 +157,17 @@ public final class TractorEntity extends Entity {
         if (this.onGround()) {
             this.setDeltaMovement(movement.x, 0.0, movement.z);
         } else {
-            this.setDeltaMovement(
-                    movement.x,
-                    movement.y * 0.98,
-                    movement.z
-            );
+            this.setDeltaMovement(movement.x, movement.y * 0.98, movement.z);
         }
 
         if (this.horizontalCollision) {
             this.currentSpeed *= 0.35;
         }
 
-        double movedX = this.getX() - oldX;
-        double movedZ = this.getZ() - oldZ;
-        double distance = Math.sqrt(movedX * movedX + movedZ * movedZ);
-
-        if (this.currentSpeed < 0.0) {
-            distance = -distance;
+        if (Math.abs(this.currentSpeed) > 0.001) {
+            this.localWheelRotation += (float)(this.currentSpeed / REAR_WHEEL_RADIUS);
+            this.localWheelRotation = wrapRadians(this.localWheelRotation);
         }
-
-        this.localWheelRotation += (float) (distance / REAR_WHEEL_RADIUS);
-        this.localWheelRotation = wrapRadians(this.localWheelRotation);
     }
 
     private void tickUncontrolledPhysics() {
@@ -189,75 +177,31 @@ public final class TractorEntity extends Entity {
         Vec3 movement = this.getDeltaMovement();
 
         if (this.onGround()) {
-            this.setDeltaMovement(
-                    movement.x * 0.8,
-                    0.0,
-                    movement.z * 0.8
-            );
+            this.setDeltaMovement(movement.x * 0.8, 0.0, movement.z * 0.8);
         } else {
-            this.setDeltaMovement(
-                    movement.x * 0.98,
-                    movement.y * 0.98,
-                    movement.z * 0.98
-            );
+            this.setDeltaMovement(movement.x * 0.98, movement.y * 0.98, movement.z * 0.98);
         }
     }
 
     private void updateServerAnimation(Input input) {
-        double targetSpeed = getTargetSpeed(
-                input.forward(),
-                input.backward()
-        );
+        double targetSpeed = getTargetSpeed(input.forward(), input.backward());
+        double acceleration = targetSpeed == 0.0 ? DECELERATION : ACCELERATION;
+        this.currentSpeed = approach(this.currentSpeed, targetSpeed, acceleration);
 
-        double acceleration = targetSpeed == 0.0
-                ? DECELERATION
-                : ACCELERATION;
-
-        this.currentSpeed = approach(
-                this.currentSpeed,
-                targetSpeed,
-                acceleration
-        );
-
-        float steeringInput = getSteeringInput(
-                input.left(),
-                input.right()
-        );
-
-        float targetSteeringAngle =
-                steeringInput * MAX_STEERING_ANGLE;
-
-        this.currentSteeringAngle = approach(
-                this.currentSteeringAngle,
-                targetSteeringAngle,
-                STEERING_SPEED
-        );
-
-        this.entityData.set(
-                DATA_STEERING_ANGLE,
-                this.currentSteeringAngle
-        );
+        float steeringInput = getSteeringInput(input.left(), input.right());
+        float targetSteeringAngle = steeringInput * MAX_STEERING_ANGLE;
+        this.currentSteeringAngle = approach(this.currentSteeringAngle, targetSteeringAngle, STEERING_SPEED);
+        this.entityData.set(DATA_STEERING_ANGLE, this.currentSteeringAngle);
 
         if (Math.abs(this.currentSpeed) > 0.001) {
-            float wheelRotation =
-                    this.entityData.get(DATA_WHEEL_ROTATION)
-                            + (float) (
-                            this.currentSpeed
-                                    / REAR_WHEEL_RADIUS
-                    );
-
-            this.entityData.set(
-                    DATA_WHEEL_ROTATION,
-                    wrapRadians(wheelRotation)
-            );
+            float wheelRotation = this.entityData.get(DATA_WHEEL_ROTATION) + (float)(this.currentSpeed / REAR_WHEEL_RADIUS);
+            this.entityData.set(DATA_WHEEL_ROTATION, wrapRadians(wheelRotation));
         }
     }
 
     @Override
     public InteractionResult interact(Player player, InteractionHand hand, Vec3 location) {
-        if (player.isSecondaryUseActive() || this.isVehicle()) {
-            return InteractionResult.PASS;
-        }
+        if (player.isSecondaryUseActive() || this.isVehicle()) return InteractionResult.PASS;
 
         if (this.level().isClientSide()) {
             faceForward(player);
@@ -284,18 +228,13 @@ public final class TractorEntity extends Entity {
 
     @Override
     protected boolean canAddPassenger(Entity passenger) {
-        return passenger instanceof Player
-                && this.getPassengers().isEmpty();
+        return passenger instanceof Player && this.getPassengers().isEmpty();
     }
 
     @Override
     public Vec3 getPassengerRidingPosition(Entity passenger) {
-        float radians =
-                (float) Math.toRadians(-this.getYRot());
-
-        Vec3 seatOffset =
-                new Vec3(0.0, 0.95, -0.50).yRot(radians);
-
+        float radians = (float)Math.toRadians(-this.getYRot());
+        Vec3 seatOffset = new Vec3(0.0, 0.95, -0.50).yRot(radians);
         return this.position().add(seatOffset);
     }
 
@@ -305,11 +244,7 @@ public final class TractorEntity extends Entity {
     }
 
     @Override
-    public boolean hurtServer(
-            ServerLevel level,
-            DamageSource source,
-            float damage
-    ) {
+    public boolean hurtServer(ServerLevel level, DamageSource source, float damage) {
         return false;
     }
 
@@ -318,98 +253,56 @@ public final class TractorEntity extends Entity {
         return true;
     }
 
-    public float getWheelRotation() {
-        if (this.level().isClientSide() && this.localControl) {
-            return this.localWheelRotation;
-        }
+    public SimpleContainer getInventory() {
+        return this.inventory;
+    }
 
+    public ItemStack addCargo(ItemStack stack) {
+        return this.inventory.addItem(stack);
+    }
+
+    public float getWheelRotation() {
+        if (this.level().isClientSide() && this.localControl) return this.localWheelRotation;
         return this.entityData.get(DATA_WHEEL_ROTATION);
     }
 
     public float getSteeringAngle() {
-        if (this.level().isClientSide() && this.localControl) {
-            return this.currentSteeringAngle;
-        }
-
+        if (this.level().isClientSide() && this.localControl) return this.currentSteeringAngle;
         return this.entityData.get(DATA_STEERING_ANGLE);
     }
 
     private void faceForward(Player player) {
         float yaw = this.getYRot();
-
-        player.absSnapRotationTo(
-                yaw,
-                player.getXRot()
-        );
-
+        player.absSnapRotationTo(yaw, player.getXRot());
         player.setYBodyRot(yaw);
         player.setYHeadRot(yaw);
     }
 
-    private static double getTargetSpeed(
-            boolean forward,
-            boolean backward
-    ) {
-        if (forward == backward) {
-            return 0.0;
-        }
-
-        return forward
-                ? MAX_FORWARD_SPEED
-                : -MAX_REVERSE_SPEED;
+    private static double getTargetSpeed(boolean forward, boolean backward) {
+        if (forward == backward) return 0.0;
+        return forward ? MAX_FORWARD_SPEED : -MAX_REVERSE_SPEED;
     }
 
-    private static float getSteeringInput(
-            boolean left,
-            boolean right
-    ) {
-        if (left == right) {
-            return 0.0F;
-        }
-
+    private static float getSteeringInput(boolean left, boolean right) {
+        if (left == right) return 0.0F;
         return left ? -1.0F : 1.0F;
     }
 
-    private static double approach(
-            double value,
-            double target,
-            double amount
-    ) {
-        if (value < target) {
-            return Math.min(value + amount, target);
-        }
-
-        if (value > target) {
-            return Math.max(value - amount, target);
-        }
-
+    private static double approach(double value, double target, double amount) {
+        if (value < target) return Math.min(value + amount, target);
+        if (value > target) return Math.max(value - amount, target);
         return target;
     }
 
-    private static float approach(
-            float value,
-            float target,
-            float amount
-    ) {
-        if (value < target) {
-            return Math.min(value + amount, target);
-        }
-
-        if (value > target) {
-            return Math.max(value - amount, target);
-        }
-
+    private static float approach(float value, float target, float amount) {
+        if (value < target) return Math.min(value + amount, target);
+        if (value > target) return Math.max(value - amount, target);
         return target;
     }
 
     private static float wrapRadians(float value) {
-        float twoPi =
-                (float) (Math.PI * 2.0);
-
-        if (value > twoPi || value < -twoPi) {
-            value %= twoPi;
-        }
-
+        float twoPi = (float)(Math.PI * 2.0);
+        if (value > twoPi || value < -twoPi) value %= twoPi;
         return value;
     }
 }
