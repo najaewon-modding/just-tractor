@@ -8,7 +8,9 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.item.context.BlockPlaceContext;
+import net.minecraft.world.item.enchantment.Enchantments;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.CropBlock;
 import net.minecraft.world.level.block.state.BlockState;
@@ -23,11 +25,12 @@ public final class TractorHarvester {
     private static final double MIN_Y_OFFSET = -0.25;
     private static final double MAX_Y_OFFSET = 0.5;
 
-    private TractorHarvester() {
-    }
+    private TractorHarvester() {}
 
     public static void harvest(TractorEntity tractor, ServerLevel level) {
         AABB box = tractor.getBoundingBox();
+        ItemStack harvestTool = createHarvestTool(tractor, level);
+
         int minX = Mth.floor(box.minX + HORIZONTAL_INSET);
         int maxX = Mth.floor(box.maxX - HORIZONTAL_INSET);
         int minY = Mth.floor(box.minY + MIN_Y_OFFSET);
@@ -38,19 +41,29 @@ public final class TractorHarvester {
         for (int y = minY; y <= maxY; y++) {
             for (int x = minX; x <= maxX; x++) {
                 for (int z = minZ; z <= maxZ; z++) {
-                    harvestAt(tractor, level, new BlockPos(x, y, z));
+                    harvestAt(tractor, level, new BlockPos(x, y, z), harvestTool);
                 }
             }
         }
     }
 
-    private static void harvestAt(TractorEntity tractor, ServerLevel level, BlockPos pos) {
+    private static ItemStack createHarvestTool(TractorEntity tractor, ServerLevel level) {
+        int fortuneLevel = tractor.getFortuneLevel();
+
+        if (fortuneLevel <= 0) return ItemStack.EMPTY;
+
+        ItemStack tool = new ItemStack(Items.DIAMOND_HOE);
+        tool.enchant(level.registryAccess().getOrThrow(Enchantments.FORTUNE), fortuneLevel);
+        return tool;
+    }
+
+    private static void harvestAt(TractorEntity tractor, ServerLevel level, BlockPos pos, ItemStack harvestTool) {
         BlockState state = level.getBlockState(pos);
 
         if (!(state.getBlock() instanceof CropBlock crop)) return;
         if (!crop.isMaxAge(state)) return;
 
-        List<ItemStack> drops = Block.getDrops(state, level, pos, level.getBlockEntity(pos), tractor, ItemStack.EMPTY);
+        List<ItemStack> drops = Block.getDrops(state, level, pos, level.getBlockEntity(pos), tractor, harvestTool);
 
         if (!level.destroyBlock(pos, false, tractor)) return;
 

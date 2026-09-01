@@ -7,16 +7,18 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
+import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 import net.njw.justtractor.JustTractor;
 import net.njw.justtractor.client.model.TractorModel;
 import net.njw.justtractor.client.renderer.TractorRenderer;
+import net.njw.justtractor.client.screen.TractorUpgradeScreen;
 import net.njw.justtractor.entity.ModEntities;
 import net.njw.justtractor.entity.TractorEntity;
+import net.njw.justtractor.menu.ModMenus;
 
 @EventBusSubscriber(modid = JustTractor.MODID, value = Dist.CLIENT)
 public final class ClientModEvents {
-    private ClientModEvents() {
-    }
+    private ClientModEvents() {}
 
     @SubscribeEvent
     public static void registerLayerDefinitions(EntityRenderersEvent.RegisterLayerDefinitions event) {
@@ -29,21 +31,18 @@ public final class ClientModEvents {
     }
 
     @SubscribeEvent
+    public static void registerMenuScreens(RegisterMenuScreensEvent event) {
+        event.register(ModMenus.TRACTOR_UPGRADE.get(), TractorUpgradeScreen::new);
+    }
+
+    @SubscribeEvent
     public static void onClientTick(ClientTickEvent.Pre event) {
         Minecraft minecraft = Minecraft.getInstance();
         LocalPlayer player = minecraft.player;
 
-        if (player == null) {
-            return;
-        }
-
-        if (!(player.getVehicle() instanceof TractorEntity tractor)) {
-            return;
-        }
-
-        if (tractor.getControllingPassenger() != player) {
-            return;
-        }
+        if (player == null) return;
+        if (!(player.getVehicle() instanceof TractorEntity tractor)) return;
+        if (tractor.getControllingPassenger() != player) return;
 
         tractor.controlFromClient(player.input.keyPresses);
     }

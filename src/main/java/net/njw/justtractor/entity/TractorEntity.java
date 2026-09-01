@@ -25,13 +25,21 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.Vec3;
+import net.njw.justtractor.menu.TractorUpgradeMenu;
 
 public final class TractorEntity extends Entity implements HasCustomInventoryScreen {
     private static final EntityDataAccessor<Float> DATA_WHEEL_ROTATION = SynchedEntityData.defineId(TractorEntity.class, EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Float> DATA_STEERING_ANGLE = SynchedEntityData.defineId(TractorEntity.class, EntityDataSerializers.FLOAT);
+    private static final EntityDataAccessor<Integer> DATA_FORTUNE_LEVEL = SynchedEntityData.defineId(TractorEntity.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Integer> DATA_SPEED_LEVEL = SynchedEntityData.defineId(TractorEntity.class, EntityDataSerializers.INT);
+
+    public static final int MAX_FORTUNE_LEVEL = 3;
+    public static final int MAX_SPEED_LEVEL = 5;
+
     private static final int INVENTORY_SIZE = 27;
-    private static final double MAX_FORWARD_SPEED = 0.20;
-    private static final double MAX_REVERSE_SPEED = 0.10;
+    private static final double BASE_MAX_FORWARD_SPEED = 0.20;
+    private static final double BASE_MAX_REVERSE_SPEED = 0.10;
+    private static final double SPEED_BONUS_PER_LEVEL = 0.10;
     private static final double ACCELERATION = 0.012;
     private static final double DECELERATION = 0.020;
     private static final float TURN_SPEED = 2.5F;
@@ -64,17 +72,23 @@ public final class TractorEntity extends Entity implements HasCustomInventoryScr
     protected void defineSynchedData(SynchedEntityData.Builder builder) {
         builder.define(DATA_WHEEL_ROTATION, 0.0F);
         builder.define(DATA_STEERING_ANGLE, 0.0F);
+        builder.define(DATA_FORTUNE_LEVEL, 0);
+        builder.define(DATA_SPEED_LEVEL, 0);
     }
 
     @Override
     protected void readAdditionalSaveData(ValueInput input) {
         this.inventory.clearContent();
         this.inventory.fromItemList(input.listOrEmpty("Inventory", ItemStack.CODEC));
+        this.setFortuneLevel(input.getIntOr("FortuneLevel", 0));
+        this.setSpeedLevel(input.getIntOr("SpeedLevel", 0));
     }
 
     @Override
     protected void addAdditionalSaveData(ValueOutput output) {
         this.inventory.storeAsItemList(output.list("Inventory", ItemStack.CODEC));
+        output.putInt("FortuneLevel", this.getFortuneLevel());
+        output.putInt("SpeedLevel", this.getSpeedLevel());
     }
 
     @Override
@@ -91,7 +105,11 @@ public final class TractorEntity extends Entity implements HasCustomInventoryScr
     @Override
     public void openCustomInventoryScreen(Player player) {
         if (!(player instanceof ServerPlayer serverPlayer) || this.getControllingPassenger() != player) return;
-        serverPlayer.openMenu(new SimpleMenuProvider((containerId, playerInventory, menuPlayer) -> ChestMenu.threeRows(containerId, playerInventory, this.inventory), Component.literal("Tractor")));
+        serverPlayer.openMenu(new SimpleMenuProvider((containerId, playerInventory, menuPlayer) -> ChestMenu.threeRows(containerId, playerInventory, this.inventory), Component.translatable("container.njw_just_tractor.tractor")));    }
+
+    private void openUpgradeScreen(Player player) {
+        if (!(player instanceof ServerPlayer serverPlayer)) return;
+        serverPlayer.openMenu(new SimpleMenuProvider((containerId, playerInventory, menuPlayer) -> new TractorUpgradeMenu(containerId, playerInventory, this), Component.translatable("screen.njw_just_tractor.tractor_upgrade")));
     }
 
     @Override
@@ -137,7 +155,7 @@ public final class TractorEntity extends Entity implements HasCustomInventoryScr
         this.currentSteeringAngle = approach(this.currentSteeringAngle, targetSteeringAngle, STEERING_SPEED);
 
         if (Math.abs(this.currentSpeed) > 0.001 && Math.abs(this.currentSteeringAngle) > 0.001F) {
-            float speedRatio = (float)Math.min(Math.abs(this.currentSpeed) / MAX_FORWARD_SPEED, 1.0);
+            float speedRatio = (float)Math.min(Math.abs(this.currentSpeed) / getMaxForwardSpeed(), 1.0);
             float reverseFactor = this.currentSpeed >= 0.0 ? 1.0F : -1.0F;
             float steeringRatio = this.currentSteeringAngle / MAX_STEERING_ANGLE;
             this.setYRot(Mth.wrapDegrees(this.getYRot() + steeringRatio * TURN_SPEED * speedRatio * reverseFactor));
@@ -201,7 +219,17 @@ public final class TractorEntity extends Entity implements HasCustomInventoryScr
 
     @Override
     public InteractionResult interact(Player player, InteractionHand hand, Vec3 location) {
-        if (player.isSecondaryUseActive() || this.isVehicle()) return InteractionResult.PASS;
+        if (player.isSecondaryUseActive()) {
+            if (player.isPassenger() || this.isVehicle()) return InteractionResult.PASS;
+
+            if (!this.level().isClientSide()) {
+                openUpgradeScreen(player);
+            }
+
+            return InteractionResult.SUCCESS;
+        }
+
+        if (this.isVehicle()) return InteractionResult.PASS;
 
         if (this.level().isClientSide()) {
             faceForward(player);
@@ -261,6 +289,22 @@ public final class TractorEntity extends Entity implements HasCustomInventoryScr
         return this.inventory.addItem(stack);
     }
 
+    public int getFortuneLevel() {
+        return this.entityData.get(DATA_FORTUNE_LEVEL);
+    }
+
+    public void setFortuneLevel(int level) {
+        this.entityData.set(DATA_FORTUNE_LEVEL, Math.max(0, Math.min(MAX_FORTUNE_LEVEL, level)));
+    }
+
+    public int getSpeedLevel() {
+        return this.entityData.get(DATA_SPEED_LEVEL);
+    }
+
+    public void setSpeedLevel(int level) {
+        this.entityData.set(DATA_SPEED_LEVEL, Math.max(0, Math.min(MAX_SPEED_LEVEL, level)));
+    }
+
     public float getWheelRotation() {
         if (this.level().isClientSide() && this.localControl) return this.localWheelRotation;
         return this.entityData.get(DATA_WHEEL_ROTATION);
@@ -271,16 +315,24 @@ public final class TractorEntity extends Entity implements HasCustomInventoryScr
         return this.entityData.get(DATA_STEERING_ANGLE);
     }
 
+    private double getMaxForwardSpeed() {
+        return BASE_MAX_FORWARD_SPEED * (1.0 + SPEED_BONUS_PER_LEVEL * this.getSpeedLevel());
+    }
+
+    private double getMaxReverseSpeed() {
+        return BASE_MAX_REVERSE_SPEED * (1.0 + SPEED_BONUS_PER_LEVEL * this.getSpeedLevel());
+    }
+
+    private double getTargetSpeed(boolean forward, boolean backward) {
+        if (forward == backward) return 0.0;
+        return forward ? getMaxForwardSpeed() : -getMaxReverseSpeed();
+    }
+
     private void faceForward(Player player) {
         float yaw = this.getYRot();
         player.absSnapRotationTo(yaw, player.getXRot());
         player.setYBodyRot(yaw);
         player.setYHeadRot(yaw);
-    }
-
-    private static double getTargetSpeed(boolean forward, boolean backward) {
-        if (forward == backward) return 0.0;
-        return forward ? MAX_FORWARD_SPEED : -MAX_REVERSE_SPEED;
     }
 
     private static float getSteeringInput(boolean left, boolean right) {

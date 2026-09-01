@@ -1,0 +1,13 @@
+{
+  "entity.njw_just_tractor.tractor": "Tractor",
+  "container.njw_just_tractor.tractor": "Tractor Cargo",
+  "screen.njw_just_tractor.tractor_upgrade": "Tractor Upgrade",
+  "upgrade.njw_just_tractor.fortune": "Fortune",
+  "upgrade.njw_just_tractor.speed": "Speed",
+  "upgrade.njw_just_tractor.level": "Level %s / %s",
+  "upgrade.njw_just_tractor.button": "Upgrade",
+  "upgrade.njw_just_tractor.max": "MAX",
+  "upgrade.njw_just_tractor.maximum_level": "Maximum level",
+  "upgrade.njw_just_tractor.creative": "Creative",
+  "upgrade.njw_just_tractor.amount": "%s / %s"
+}
