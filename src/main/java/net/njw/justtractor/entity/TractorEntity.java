@@ -12,7 +12,11 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.damagesource.DamageSource;
-import net.minecraft.world.entity.*;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.HasCustomInventoryScreen;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.MoverType;
 import net.minecraft.world.entity.player.Input;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.ChestMenu;
@@ -59,6 +63,7 @@ public final class TractorEntity extends Entity implements HasCustomInventoryScr
     private boolean clientBackward;
     private boolean clientLeft;
     private boolean clientRight;
+    private boolean allowTractorPush;
 
     public TractorEntity(EntityType<? extends TractorEntity> entityType, Level level) {
         super(entityType, level);
@@ -119,8 +124,30 @@ public final class TractorEntity extends Entity implements HasCustomInventoryScr
     }
 
     @Override
+    public void push(double x, double y, double z) {
+        if (this.allowTractorPush) {
+            super.push(x, y, z);
+        }
+    }
+
+    @Override
     public void push(Entity entity) {
         if (this.isPassengerOfSameVehicle(entity)) return;
+
+        if (entity instanceof TractorEntity tractor) {
+            this.allowTractorPush = true;
+            tractor.allowTractorPush = true;
+
+            try {
+                super.push(entity);
+            } finally {
+                this.allowTractorPush = false;
+                tractor.allowTractorPush = false;
+            }
+
+            return;
+        }
+
         super.push(entity);
     }
 
@@ -205,7 +232,7 @@ public final class TractorEntity extends Entity implements HasCustomInventoryScr
         if (this.onGround()) {
             this.setDeltaMovement(movement.x, 0.0, movement.z);
         } else {
-            this.setDeltaMovement(movement.x * 0.98, movement.y * 0.98, movement.z * 0.98);
+            this.setDeltaMovement(movement.x, movement.y * 0.98, movement.z * 0.98);
         }
 
         if (this.horizontalCollision) {
@@ -249,7 +276,7 @@ public final class TractorEntity extends Entity implements HasCustomInventoryScr
     private void pushNearbyEntities() {
         for (Entity entity : this.level().getPushableEntities(this, this.getBoundingBox().inflate(ENTITY_COLLISION_MARGIN, 0.0, ENTITY_COLLISION_MARGIN))) {
             if (!canVehicleCollide(this, entity)) continue;
-            entity.push(this);
+            this.push(entity);
         }
     }
 
