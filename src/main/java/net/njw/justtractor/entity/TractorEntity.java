@@ -22,9 +22,11 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.ChestMenu;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.Vec3;
+import net.njw.justtractor.item.TractorItem;
 import net.njw.justtractor.menu.TractorUpgradeMenu;
 
 public final class TractorEntity extends Entity implements HasCustomInventoryScreen {
@@ -48,6 +50,8 @@ public final class TractorEntity extends Entity implements HasCustomInventoryScr
     private static final double REAR_WHEEL_RADIUS = 9.0 / 16.0;
     private static final double GRAVITY = 0.08;
     private static final double ENTITY_COLLISION_MARGIN = 0.2;
+    private static final int RECOVERY_HITS = 4;
+    private static final int RECOVERY_HIT_RESET_TICKS = 40;
 
     private final SimpleContainer inventory = new SimpleContainer(INVENTORY_SIZE) {
         @Override
@@ -64,6 +68,8 @@ public final class TractorEntity extends Entity implements HasCustomInventoryScr
     private boolean clientLeft;
     private boolean clientRight;
     private boolean allowTractorPush;
+    private int recoveryHitCount;
+    private int lastRecoveryHitTick = -RECOVERY_HIT_RESET_TICKS - 1;
 
     public TractorEntity(EntityType<? extends TractorEntity> entityType, Level level) {
         super(entityType, level);
@@ -336,7 +342,42 @@ public final class TractorEntity extends Entity implements HasCustomInventoryScr
 
     @Override
     public boolean hurtServer(ServerLevel level, DamageSource source, float damage) {
-        return false;
+        if (!(source.getDirectEntity() instanceof Player player)) return false;
+        if (this.isVehicle()) return false;
+
+        if (player.isCreative()) {
+            recover(level);
+            return true;
+        }
+
+        if (this.tickCount - this.lastRecoveryHitTick > RECOVERY_HIT_RESET_TICKS) {
+            this.recoveryHitCount = 0;
+        }
+
+        this.lastRecoveryHitTick = this.tickCount;
+        this.recoveryHitCount++;
+
+        if (this.recoveryHitCount >= RECOVERY_HITS) {
+            recover(level);
+        } else {
+            level.broadcastDamageEvent(this, source);
+        }
+
+        return true;
+    }
+
+    private void recover(ServerLevel level) {
+        for (int slot = 0; slot < this.inventory.getContainerSize(); slot++) {
+            ItemStack stack = this.inventory.removeItemNoUpdate(slot);
+
+            if (!stack.isEmpty()) {
+                Block.popResource(level, this.blockPosition(), stack);
+            }
+        }
+
+        ItemStack tractorStack = TractorItem.createStack(this.getFortuneLevel(), this.getSpeedLevel());
+        Block.popResource(level, this.blockPosition(), tractorStack);
+        this.discard();
     }
 
     @Override

@@ -5,6 +5,7 @@ import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.njw.justtractor.entity.ModEntities;
+import net.njw.justtractor.item.ModItems;
 import net.njw.justtractor.menu.ModMenus;
 import org.slf4j.Logger;
 
@@ -14,6 +15,7 @@ public class JustTractor {
     public static final Logger LOGGER = LogUtils.getLogger();
 
     public JustTractor(IEventBus modEventBus, ModContainer modContainer) {
+        ModItems.ITEMS.register(modEventBus);
         ModEntities.ENTITY_TYPES.register(modEventBus);
         ModMenus.MENU_TYPES.register(modEventBus);
     }

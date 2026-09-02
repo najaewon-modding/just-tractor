@@ -1,5 +1,6 @@
 {
   "entity.njw_just_tractor.tractor": "Tractor",
+  "item.njw_just_tractor.tractor": "Tractor",
   "container.njw_just_tractor.tractor": "Tractor Cargo",
   "screen.njw_just_tractor.tractor_upgrade": "Tractor Upgrade",
   "upgrade.njw_just_tractor.fortune": "Fortune",
