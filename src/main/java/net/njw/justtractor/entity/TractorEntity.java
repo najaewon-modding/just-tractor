@@ -12,11 +12,7 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.damagesource.DamageSource;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.HasCustomInventoryScreen;
-import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.MoverType;
+import net.minecraft.world.entity.*;
 import net.minecraft.world.entity.player.Input;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.ChestMenu;
@@ -47,6 +43,7 @@ public final class TractorEntity extends Entity implements HasCustomInventoryScr
     private static final float STEERING_SPEED = 0.08F;
     private static final double REAR_WHEEL_RADIUS = 9.0 / 16.0;
     private static final double GRAVITY = 0.08;
+    private static final double ENTITY_COLLISION_MARGIN = 0.2;
 
     private final SimpleContainer inventory = new SimpleContainer(INVENTORY_SIZE) {
         @Override
@@ -65,6 +62,7 @@ public final class TractorEntity extends Entity implements HasCustomInventoryScr
 
     public TractorEntity(EntityType<? extends TractorEntity> entityType, Level level) {
         super(entityType, level);
+        this.blocksBuilding = true;
     }
 
     @Override
@@ -102,6 +100,31 @@ public final class TractorEntity extends Entity implements HasCustomInventoryScr
     }
 
     @Override
+    public boolean canCollideWith(Entity entity) {
+        return canVehicleCollide(this, entity);
+    }
+
+    private static boolean canVehicleCollide(Entity vehicle, Entity entity) {
+        return !vehicle.isPassengerOfSameVehicle(entity) && (entity.canBeCollidedWith(vehicle) || entity.isPushable());
+    }
+
+    @Override
+    public boolean canBeCollidedWith(Entity other) {
+        return !this.isRemoved() && (other == null || !this.isPassengerOfSameVehicle(other));
+    }
+
+    @Override
+    public boolean isPushable() {
+        return true;
+    }
+
+    @Override
+    public void push(Entity entity) {
+        if (this.isPassengerOfSameVehicle(entity)) return;
+        super.push(entity);
+    }
+
+    @Override
     public void openCustomInventoryScreen(Player player) {
         if (!(player instanceof ServerPlayer serverPlayer) || this.getControllingPassenger() != player) return;
         serverPlayer.openMenu(new SimpleMenuProvider((containerId, playerInventory, menuPlayer) -> ChestMenu.threeRows(containerId, playerInventory, this.inventory), Component.translatable("container.njw_just_tractor.tractor")));
@@ -123,6 +146,7 @@ public final class TractorEntity extends Entity implements HasCustomInventoryScr
                 tickControlledMovement();
             }
 
+            pushNearbyEntities();
             return;
         }
 
@@ -138,6 +162,8 @@ public final class TractorEntity extends Entity implements HasCustomInventoryScr
             this.entityData.set(DATA_STEERING_ANGLE, this.currentSteeringAngle);
             tickUncontrolledPhysics();
         }
+
+        pushNearbyEntities();
     }
 
     public void controlFromClient(Input input) {
@@ -179,7 +205,7 @@ public final class TractorEntity extends Entity implements HasCustomInventoryScr
         if (this.onGround()) {
             this.setDeltaMovement(movement.x, 0.0, movement.z);
         } else {
-            this.setDeltaMovement(movement.x, movement.y * 0.98, movement.z);
+            this.setDeltaMovement(movement.x * 0.98, movement.y * 0.98, movement.z * 0.98);
         }
 
         if (this.horizontalCollision) {
@@ -217,6 +243,13 @@ public final class TractorEntity extends Entity implements HasCustomInventoryScr
         if (Math.abs(this.currentSpeed) > 0.001) {
             double wheelRotation = this.entityData.get(DATA_WHEEL_ROTATION) + this.currentSpeed / REAR_WHEEL_RADIUS;
             this.entityData.set(DATA_WHEEL_ROTATION, wrapRadians(wheelRotation));
+        }
+    }
+
+    private void pushNearbyEntities() {
+        for (Entity entity : this.level().getPushableEntities(this, this.getBoundingBox().inflate(ENTITY_COLLISION_MARGIN, 0.0, ENTITY_COLLISION_MARGIN))) {
+            if (!canVehicleCollide(this, entity)) continue;
+            entity.push(this);
         }
     }
 
