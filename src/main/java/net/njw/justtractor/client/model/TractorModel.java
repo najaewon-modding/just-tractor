@@ -17,8 +17,6 @@ public final class TractorModel extends EntityModel<TractorRenderState> {
 
     private final ModelPart body;
     private final ModelPart details;
-    private final ModelPart frontLeftSteering;
-    private final ModelPart frontRightSteering;
     private final ModelPart frontLeftWheel;
     private final ModelPart frontRightWheel;
     private final ModelPart rearLeftWheel;
@@ -28,10 +26,8 @@ public final class TractorModel extends EntityModel<TractorRenderState> {
         super(root);
         this.body = root.getChild("body");
         this.details = root.getChild("details");
-        this.frontLeftSteering = root.getChild("front_left_steering");
-        this.frontRightSteering = root.getChild("front_right_steering");
-        this.frontLeftWheel = this.frontLeftSteering.getChild("wheel");
-        this.frontRightWheel = this.frontRightSteering.getChild("wheel");
+        this.frontLeftWheel = root.getChild("front_left_steering").getChild("wheel");
+        this.frontRightWheel = root.getChild("front_right_steering").getChild("wheel");
         this.rearLeftWheel = root.getChild("rear_left_wheel");
         this.rearRightWheel = root.getChild("rear_right_wheel");
     }
@@ -60,7 +56,6 @@ public final class TractorModel extends EntityModel<TractorRenderState> {
         details.addOrReplaceChild("seat_back", CubeListBuilder.create().texOffs(0, 0).addBox(-5.0F, -7.0F, -2.0F, 10.0F, 8.0F, 3.0F), PartPose.offset(0.0F, 10.0F, 12.0F));
 
         PartDefinition steeringColumn = details.addOrReplaceChild("steering_column", CubeListBuilder.create().texOffs(0, 0).addBox(-1.0F, -7.0F, -1.0F, 2.0F, 7.0F, 2.0F), PartPose.offsetAndRotation(0.0F, 11.0F, 1.0F, -0.45F, 0.0F, 0.0F));
-
         steeringColumn.addOrReplaceChild("steering_wheel", CubeListBuilder.create().texOffs(0, 0).addBox(-4.0F, -0.5F, -1.0F, 8.0F, 1.0F, 2.0F).texOffs(0, 0).addBox(-1.0F, -0.5F, -4.0F, 2.0F, 1.0F, 8.0F), PartPose.offset(0.0F, -7.0F, 0.0F));
 
         details.addOrReplaceChild("exhaust", CubeListBuilder.create().texOffs(0, 0).addBox(-1.5F, -12.0F, -1.5F, 3.0F, 12.0F, 3.0F).texOffs(0, 0).addBox(-2.0F, -15.0F, -2.0F, 4.0F, 3.0F, 4.0F), PartPose.offset(-6.0F, 10.0F, -11.0F));
@@ -82,17 +77,6 @@ public final class TractorModel extends EntityModel<TractorRenderState> {
         return LayerDefinition.create(mesh, 128, 128);
     }
 
-    @Override
-    public void setupAnim(TractorRenderState state) {
-        super.setupAnim(state);
-        this.frontLeftSteering.yRot = state.steeringAngle;
-        this.frontRightSteering.yRot = state.steeringAngle;
-        this.frontLeftWheel.xRot = state.wheelRotation;
-        this.frontRightWheel.xRot = state.wheelRotation;
-        this.rearLeftWheel.xRot = state.wheelRotation;
-        this.rearRightWheel.xRot = state.wheelRotation;
-    }
-
     public ModelPart body() {
         return this.body;
     }
@@ -101,12 +85,12 @@ public final class TractorModel extends EntityModel<TractorRenderState> {
         return this.details;
     }
 
-    public ModelPart frontLeftSteering() {
-        return this.frontLeftSteering;
+    public ModelPart frontLeftWheel() {
+        return this.frontLeftWheel;
     }
 
-    public ModelPart frontRightSteering() {
-        return this.frontRightSteering;
+    public ModelPart frontRightWheel() {
+        return this.frontRightWheel;
     }
 
     public ModelPart rearLeftWheel() {

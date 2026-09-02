@@ -57,12 +57,11 @@ public final class TractorEntity extends Entity implements HasCustomInventoryScr
 
     private double currentSpeed;
     private float currentSteeringAngle;
-    private float localWheelRotation;
+    private double localWheelRotation;
     private boolean clientForward;
     private boolean clientBackward;
     private boolean clientLeft;
     private boolean clientRight;
-    private boolean localControl;
 
     public TractorEntity(EntityType<? extends TractorEntity> entityType, Level level) {
         super(entityType, level);
@@ -105,7 +104,8 @@ public final class TractorEntity extends Entity implements HasCustomInventoryScr
     @Override
     public void openCustomInventoryScreen(Player player) {
         if (!(player instanceof ServerPlayer serverPlayer) || this.getControllingPassenger() != player) return;
-        serverPlayer.openMenu(new SimpleMenuProvider((containerId, playerInventory, menuPlayer) -> ChestMenu.threeRows(containerId, playerInventory, this.inventory), Component.translatable("container.njw_just_tractor.tractor")));    }
+        serverPlayer.openMenu(new SimpleMenuProvider((containerId, playerInventory, menuPlayer) -> ChestMenu.threeRows(containerId, playerInventory, this.inventory), Component.translatable("container.njw_just_tractor.tractor")));
+    }
 
     private void openUpgradeScreen(Player player) {
         if (!(player instanceof ServerPlayer serverPlayer)) return;
@@ -116,13 +116,17 @@ public final class TractorEntity extends Entity implements HasCustomInventoryScr
     public void tick() {
         super.tick();
 
+        LivingEntity passenger = this.getControllingPassenger();
+
         if (this.level().isClientSide()) {
-            if (this.localControl && this.getControllingPassenger() != null) tickControlledMovement();
-            else this.localControl = false;
+            if (this.isLocalInstanceAuthoritative() && passenger != null) {
+                tickControlledMovement();
+            }
+
             return;
         }
 
-        if (this.getControllingPassenger() instanceof ServerPlayer player) {
+        if (passenger instanceof ServerPlayer player) {
             updateServerAnimation(player.getLastClientInput());
 
             if (Math.abs(this.currentSpeed) > 0.01) {
@@ -138,11 +142,11 @@ public final class TractorEntity extends Entity implements HasCustomInventoryScr
 
     public void controlFromClient(Input input) {
         if (!this.level().isClientSide()) return;
+
         this.clientForward = input.forward();
         this.clientBackward = input.backward();
         this.clientLeft = input.left();
         this.clientRight = input.right();
-        this.localControl = true;
     }
 
     private void tickControlledMovement() {
@@ -183,8 +187,7 @@ public final class TractorEntity extends Entity implements HasCustomInventoryScr
         }
 
         if (Math.abs(this.currentSpeed) > 0.001) {
-            this.localWheelRotation += (float)(this.currentSpeed / REAR_WHEEL_RADIUS);
-            this.localWheelRotation = wrapRadians(this.localWheelRotation);
+            this.localWheelRotation += this.currentSpeed / REAR_WHEEL_RADIUS;
         }
     }
 
@@ -212,7 +215,7 @@ public final class TractorEntity extends Entity implements HasCustomInventoryScr
         this.entityData.set(DATA_STEERING_ANGLE, this.currentSteeringAngle);
 
         if (Math.abs(this.currentSpeed) > 0.001) {
-            float wheelRotation = this.entityData.get(DATA_WHEEL_ROTATION) + (float)(this.currentSpeed / REAR_WHEEL_RADIUS);
+            double wheelRotation = this.entityData.get(DATA_WHEEL_ROTATION) + this.currentSpeed / REAR_WHEEL_RADIUS;
             this.entityData.set(DATA_WHEEL_ROTATION, wrapRadians(wheelRotation));
         }
     }
@@ -305,13 +308,20 @@ public final class TractorEntity extends Entity implements HasCustomInventoryScr
         this.entityData.set(DATA_SPEED_LEVEL, Math.max(0, Math.min(MAX_SPEED_LEVEL, level)));
     }
 
-    public float getWheelRotation() {
-        if (this.level().isClientSide() && this.localControl) return this.localWheelRotation;
+    public float getWheelRotation(float partialTick) {
+        if (this.level().isClientSide() && this.isLocalInstanceAuthoritative() && this.getControllingPassenger() != null) {
+            double rotation = this.localWheelRotation + this.currentSpeed / REAR_WHEEL_RADIUS * partialTick;
+            return wrapRadians(rotation);
+        }
+
         return this.entityData.get(DATA_WHEEL_ROTATION);
     }
 
     public float getSteeringAngle() {
-        if (this.level().isClientSide() && this.localControl) return this.currentSteeringAngle;
+        if (this.level().isClientSide() && this.isLocalInstanceAuthoritative() && this.getControllingPassenger() != null) {
+            return this.currentSteeringAngle;
+        }
+
         return this.entityData.get(DATA_STEERING_ANGLE);
     }
 
@@ -352,9 +362,9 @@ public final class TractorEntity extends Entity implements HasCustomInventoryScr
         return target;
     }
 
-    private static float wrapRadians(float value) {
-        float twoPi = (float)(Math.PI * 2.0);
-        if (value > twoPi || value < -twoPi) value %= twoPi;
-        return value;
+    private static float wrapRadians(double value) {
+        double twoPi = Math.PI * 2.0;
+        value %= twoPi;
+        return (float)value;
     }
 }

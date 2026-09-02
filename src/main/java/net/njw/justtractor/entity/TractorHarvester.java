@@ -29,7 +29,6 @@ public final class TractorHarvester {
 
     public static void harvest(TractorEntity tractor, ServerLevel level) {
         AABB box = tractor.getBoundingBox();
-        ItemStack harvestTool = createHarvestTool(tractor, level);
 
         int minX = Mth.floor(box.minX + HORIZONTAL_INSET);
         int maxX = Mth.floor(box.maxX - HORIZONTAL_INSET);
@@ -38,10 +37,23 @@ public final class TractorHarvester {
         int minZ = Mth.floor(box.minZ + HORIZONTAL_INSET);
         int maxZ = Mth.floor(box.maxZ - HORIZONTAL_INSET);
 
+        BlockPos.MutableBlockPos mutablePos = new BlockPos.MutableBlockPos();
+        ItemStack harvestTool = null;
+
         for (int y = minY; y <= maxY; y++) {
             for (int x = minX; x <= maxX; x++) {
                 for (int z = minZ; z <= maxZ; z++) {
-                    harvestAt(tractor, level, new BlockPos(x, y, z), harvestTool);
+                    mutablePos.set(x, y, z);
+                    BlockState state = level.getBlockState(mutablePos);
+
+                    if (!(state.getBlock() instanceof CropBlock crop)) continue;
+                    if (!crop.isMaxAge(state)) continue;
+
+                    if (harvestTool == null) {
+                        harvestTool = createHarvestTool(tractor, level);
+                    }
+
+                    harvestAt(tractor, level, mutablePos.immutable(), state, crop, harvestTool);
                 }
             }
         }
@@ -57,12 +69,7 @@ public final class TractorHarvester {
         return tool;
     }
 
-    private static void harvestAt(TractorEntity tractor, ServerLevel level, BlockPos pos, ItemStack harvestTool) {
-        BlockState state = level.getBlockState(pos);
-
-        if (!(state.getBlock() instanceof CropBlock crop)) return;
-        if (!crop.isMaxAge(state)) return;
-
+    private static void harvestAt(TractorEntity tractor, ServerLevel level, BlockPos pos, BlockState state, CropBlock crop, ItemStack harvestTool) {
         List<ItemStack> drops = Block.getDrops(state, level, pos, level.getBlockEntity(pos), tractor, harvestTool);
 
         if (!level.destroyBlock(pos, false, tractor)) return;
