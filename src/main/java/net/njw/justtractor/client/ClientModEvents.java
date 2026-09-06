@@ -2,14 +2,17 @@ package net.njw.justtractor.client;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.resources.Identifier;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
+import net.neoforged.neoforge.client.event.RegisterSpecialModelRendererEvent;
 import net.njw.justtractor.JustTractor;
 import net.njw.justtractor.client.model.TractorModel;
+import net.njw.justtractor.client.renderer.TractorItemSpecialRenderer;
 import net.njw.justtractor.client.renderer.TractorRenderer;
 import net.njw.justtractor.client.screen.TractorInventoryScreen;
 import net.njw.justtractor.client.screen.TractorUpgradeScreen;
@@ -29,6 +32,11 @@ public final class ClientModEvents {
     @SubscribeEvent
     public static void registerRenderers(EntityRenderersEvent.RegisterRenderers event) {
         event.registerEntityRenderer(ModEntities.TRACTOR.get(), TractorRenderer::new);
+    }
+
+    @SubscribeEvent
+    public static void registerSpecialModelRenderers(RegisterSpecialModelRendererEvent event) {
+        event.register(Identifier.fromNamespaceAndPath(JustTractor.MODID, "tractor"), TractorItemSpecialRenderer.Unbaked.MAP_CODEC);
     }
 
     @SubscribeEvent

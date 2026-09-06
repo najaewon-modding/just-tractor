@@ -39,7 +39,7 @@ public final class TractorInventoryMenu extends AbstractContainerMenu {
             }
         }
 
-        this.addSlot(new Slot(attachment, 0, 180, 18) {
+        this.addSlot(new Slot(attachment, 0, 175, 27) {
             @Override
             public boolean mayPlace(ItemStack stack) {
                 return stack.getItem() instanceof TractorAttachmentItem;
