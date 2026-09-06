@@ -19,7 +19,6 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.MoverType;
 import net.minecraft.world.entity.player.Input;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.inventory.ChestMenu;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
@@ -27,6 +26,7 @@ import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.Vec3;
 import net.njw.justtractor.item.TractorItem;
+import net.njw.justtractor.menu.TractorInventoryMenu;
 import net.njw.justtractor.menu.TractorUpgradeMenu;
 
 public final class TractorEntity extends Entity implements HasCustomInventoryScreen {
@@ -39,6 +39,7 @@ public final class TractorEntity extends Entity implements HasCustomInventoryScr
     public static final int MAX_SPEED_LEVEL = 5;
 
     private static final int INVENTORY_SIZE = 27;
+    private static final int ATTACHMENT_INVENTORY_SIZE = 1;
     private static final double BASE_MAX_FORWARD_SPEED = 0.20;
     private static final double BASE_MAX_REVERSE_SPEED = 0.10;
     private static final double SPEED_BONUS_PER_LEVEL = 0.10;
@@ -54,6 +55,13 @@ public final class TractorEntity extends Entity implements HasCustomInventoryScr
     private static final int RECOVERY_HIT_RESET_TICKS = 40;
 
     private final SimpleContainer inventory = new SimpleContainer(INVENTORY_SIZE) {
+        @Override
+        public boolean stillValid(Player player) {
+            return !TractorEntity.this.isRemoved() && TractorEntity.this.getControllingPassenger() == player;
+        }
+    };
+
+    private final SimpleContainer attachmentInventory = new SimpleContainer(ATTACHMENT_INVENTORY_SIZE) {
         @Override
         public boolean stillValid(Player player) {
             return !TractorEntity.this.isRemoved() && TractorEntity.this.getControllingPassenger() == player;
@@ -88,6 +96,8 @@ public final class TractorEntity extends Entity implements HasCustomInventoryScr
     protected void readAdditionalSaveData(ValueInput input) {
         this.inventory.clearContent();
         this.inventory.fromItemList(input.listOrEmpty("Inventory", ItemStack.CODEC));
+        this.attachmentInventory.clearContent();
+        this.attachmentInventory.fromItemList(input.listOrEmpty("Attachment", ItemStack.CODEC));
         this.setFortuneLevel(input.getIntOr("FortuneLevel", 0));
         this.setSpeedLevel(input.getIntOr("SpeedLevel", 0));
     }
@@ -95,6 +105,7 @@ public final class TractorEntity extends Entity implements HasCustomInventoryScr
     @Override
     protected void addAdditionalSaveData(ValueOutput output) {
         this.inventory.storeAsItemList(output.list("Inventory", ItemStack.CODEC));
+        this.attachmentInventory.storeAsItemList(output.list("Attachment", ItemStack.CODEC));
         output.putInt("FortuneLevel", this.getFortuneLevel());
         output.putInt("SpeedLevel", this.getSpeedLevel());
     }
@@ -160,7 +171,7 @@ public final class TractorEntity extends Entity implements HasCustomInventoryScr
     @Override
     public void openCustomInventoryScreen(Player player) {
         if (!(player instanceof ServerPlayer serverPlayer) || this.getControllingPassenger() != player) return;
-        serverPlayer.openMenu(new SimpleMenuProvider((containerId, playerInventory, menuPlayer) -> ChestMenu.threeRows(containerId, playerInventory, this.inventory), Component.translatable("container.njw_just_tractor.tractor")));
+        serverPlayer.openMenu(new SimpleMenuProvider((containerId, playerInventory, menuPlayer) -> new TractorInventoryMenu(containerId, playerInventory, this), Component.translatable("container.njw_just_tractor.tractor")));
     }
 
     private void openUpgradeScreen(Player player) {
@@ -375,6 +386,14 @@ public final class TractorEntity extends Entity implements HasCustomInventoryScr
             }
         }
 
+        for (int slot = 0; slot < this.attachmentInventory.getContainerSize(); slot++) {
+            ItemStack stack = this.attachmentInventory.removeItemNoUpdate(slot);
+
+            if (!stack.isEmpty()) {
+                Block.popResource(level, this.blockPosition(), stack);
+            }
+        }
+
         ItemStack tractorStack = TractorItem.createStack(this.getFortuneLevel(), this.getSpeedLevel());
         Block.popResource(level, this.blockPosition(), tractorStack);
         this.discard();
@@ -387,6 +406,10 @@ public final class TractorEntity extends Entity implements HasCustomInventoryScr
 
     public SimpleContainer getInventory() {
         return this.inventory;
+    }
+
+    public SimpleContainer getAttachmentInventory() {
+        return this.attachmentInventory;
     }
 
     public ItemStack addCargo(ItemStack stack) {

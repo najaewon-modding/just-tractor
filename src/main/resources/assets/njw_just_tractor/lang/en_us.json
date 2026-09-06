@@ -1,7 +1,11 @@
 {
   "entity.njw_just_tractor.tractor": "Tractor",
   "item.njw_just_tractor.tractor": "Tractor",
+  "item.njw_just_tractor.harvester_attachment": "Harvester Attachment",
+  "item.njw_just_tractor.tiller_attachment": "Tiller Attachment",
+  "item.njw_just_tractor.planter_attachment": "Planter Attachment",
   "container.njw_just_tractor.tractor": "Tractor Cargo",
+  "container.njw_just_tractor.attachment": "Attachment",
   "screen.njw_just_tractor.tractor_upgrade": "Tractor Upgrade",
   "upgrade.njw_just_tractor.fortune": "Fortune",
   "upgrade.njw_just_tractor.speed": "Speed",

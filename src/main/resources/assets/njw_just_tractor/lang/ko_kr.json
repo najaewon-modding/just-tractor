@@ -1,7 +1,11 @@
 {
   "entity.njw_just_tractor.tractor": "트랙터",
   "item.njw_just_tractor.tractor": "트랙터",
+  "item.njw_just_tractor.harvester_attachment": "수확 장치",
+  "item.njw_just_tractor.tiller_attachment": "경작 장치",
+  "item.njw_just_tractor.planter_attachment": "파종 장치",
   "container.njw_just_tractor.tractor": "트랙터 화물칸",
+  "container.njw_just_tractor.attachment": "장치",
   "screen.njw_just_tractor.tractor_upgrade": "트랙터 강화",
   "upgrade.njw_just_tractor.fortune": "행운",
   "upgrade.njw_just_tractor.speed": "속도",

@@ -11,6 +11,7 @@ import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 import net.njw.justtractor.JustTractor;
 import net.njw.justtractor.client.model.TractorModel;
 import net.njw.justtractor.client.renderer.TractorRenderer;
+import net.njw.justtractor.client.screen.TractorInventoryScreen;
 import net.njw.justtractor.client.screen.TractorUpgradeScreen;
 import net.njw.justtractor.entity.ModEntities;
 import net.njw.justtractor.entity.TractorEntity;
@@ -32,6 +33,7 @@ public final class ClientModEvents {
 
     @SubscribeEvent
     public static void registerMenuScreens(RegisterMenuScreensEvent event) {
+        event.register(ModMenus.TRACTOR_INVENTORY.get(), TractorInventoryScreen::new);
         event.register(ModMenus.TRACTOR_UPGRADE.get(), TractorUpgradeScreen::new);
     }
 
