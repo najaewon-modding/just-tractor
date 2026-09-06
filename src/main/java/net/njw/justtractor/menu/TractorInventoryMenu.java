@@ -35,18 +35,18 @@ public final class TractorInventoryMenu extends AbstractContainerMenu {
 
         for (int row = 0; row < 3; row++) {
             for (int column = 0; column < 9; column++) {
-                this.addSlot(new Slot(cargo, column + row * 9, 8 + column * 18, 32 + row * 18));
+                this.addSlot(new Slot(cargo, column + row * 9, 8 + column * 18, 18 + row * 18));
             }
         }
 
-        this.addSlot(new Slot(attachment, 0, 199, 50) {
+        this.addSlot(new Slot(attachment, 0, 180, 18) {
             @Override
             public boolean mayPlace(ItemStack stack) {
                 return stack.getItem() instanceof TractorAttachmentItem;
             }
         });
 
-        this.addStandardInventorySlots(playerInventory, 8, 140);
+        this.addStandardInventorySlots(playerInventory, 8, 85);
     }
 
     @Override

@@ -1,6 +1,6 @@
 {
   "model": {
     "type": "minecraft:model",
-    "model": "minecraft:item/shears"
+    "model": "njw_just_tractor:item/harvester_attachment"
   }
 }
