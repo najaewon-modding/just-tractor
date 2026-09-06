@@ -10,6 +10,9 @@ import net.minecraft.world.item.ItemStack;
 import net.njw.justtractor.item.ModItems;
 import net.njw.justtractor.menu.TractorInventoryMenu;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public final class TractorInventoryScreen extends AbstractContainerScreen<TractorInventoryMenu> {
     private static final Identifier CONTAINER_TEXTURE = Identifier.withDefaultNamespace("textures/gui/container/generic_54.png");
     private static final Component ATTACHMENT_TITLE = Component.translatable("container.njw_just_tractor.attachment");
@@ -82,10 +85,49 @@ public final class TractorInventoryScreen extends AbstractContainerScreen<Tracto
         Component description = getAttachmentDescription(stack);
         if (description == null) return;
         int y = PANEL_Y + 50;
-        for (var line : this.font.split(description, DESCRIPTION_WIDTH)) {
-            graphics.text(this.font, line, PANEL_X + PANEL_PADDING, y, 0xFF606060, false);
+        for (String line : wrapDescription(description.getString())) {
+            graphics.text(this.font, Component.literal(line), PANEL_X + PANEL_PADDING, y, 0xFF606060, false);
             y += 10;
         }
+    }
+
+    private List<String> wrapDescription(String text) {
+        List<String> lines = new ArrayList<>();
+        boolean hyphenate = !containsHangul(text);
+        int start = 0;
+
+        while (start < text.length()) {
+            while (start < text.length() && Character.isWhitespace(text.charAt(start))) start++;
+            if (start >= text.length()) break;
+
+            int end = start;
+            while (end < text.length() && this.font.width(text.substring(start, end + 1)) <= DESCRIPTION_WIDTH) end++;
+            if (end == text.length()) {
+                lines.add(text.substring(start).stripTrailing());
+                break;
+            }
+
+            int breakPos = end;
+            if (breakPos == start) breakPos = Math.min(start + 1, text.length());
+            boolean splitWord = hyphenate && breakPos > start && breakPos < text.length() && !Character.isWhitespace(text.charAt(breakPos - 1)) && !Character.isWhitespace(text.charAt(breakPos));
+
+            if (splitWord) {
+                while (breakPos > start && this.font.width(text.substring(start, breakPos).stripTrailing() + "-") > DESCRIPTION_WIDTH) breakPos--;
+                if (breakPos == start) breakPos = Math.min(start + 1, text.length());
+            }
+
+            String line = text.substring(start, breakPos).stripTrailing();
+            boolean actualSplitWord = hyphenate && breakPos > start && breakPos < text.length() && !Character.isWhitespace(text.charAt(breakPos - 1)) && !Character.isWhitespace(text.charAt(breakPos));
+            if (actualSplitWord) line += "-";
+            lines.add(line);
+            start = breakPos;
+        }
+
+        return lines;
+    }
+
+    private static boolean containsHangul(String text) {
+        return text.codePoints().anyMatch(codePoint -> codePoint >= 0xAC00 && codePoint <= 0xD7A3 || codePoint >= 0x1100 && codePoint <= 0x11FF || codePoint >= 0x3130 && codePoint <= 0x318F);
     }
 
     private static Component getAttachmentDescription(ItemStack stack) {
