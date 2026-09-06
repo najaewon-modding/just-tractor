@@ -4,6 +4,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.tags.FluidTags;
 import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.ItemStack;
@@ -20,6 +21,7 @@ import net.neoforged.neoforge.common.ItemAbilities;
 public final class TractorTiller {
     private static final double HORIZONTAL_INSET = 0.1;
     private static final double GROUND_Y_OFFSET = -0.01;
+    private static final int WATER_RANGE = 4;
 
     private TractorTiller() {}
 
@@ -35,6 +37,8 @@ public final class TractorTiller {
         for (int x = minX; x <= maxX; x++) {
             for (int z = minZ; z <= maxZ; z++) {
                 BlockPos pos = new BlockPos(x, y, z);
+                if (!hasNearbyWater(level, pos)) continue;
+
                 BlockState state = level.getBlockState(pos);
                 Vec3 hitLocation = new Vec3(x + 0.5, y + 1.0, z + 0.5);
                 BlockHitResult hitResult = new BlockHitResult(hitLocation, Direction.UP, pos, false);
@@ -46,6 +50,18 @@ public final class TractorTiller {
                 }
             }
         }
+    }
+
+    private static boolean hasNearbyWater(ServerLevel level, BlockPos farmlandPos) {
+        for (int dx = -WATER_RANGE; dx <= WATER_RANGE; dx++) {
+            for (int dz = -WATER_RANGE; dz <= WATER_RANGE; dz++) {
+                for (int dy = 0; dy <= 1; dy++) {
+                    if (level.getFluidState(farmlandPos.offset(dx, dy, dz)).is(FluidTags.WATER)) return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     private static final class AttachmentUseOnContext extends UseOnContext {
