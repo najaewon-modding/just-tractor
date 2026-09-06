@@ -85,15 +85,22 @@ public final class TractorInventoryScreen extends AbstractContainerScreen<Tracto
         Component description = getAttachmentDescription(stack);
         if (description == null) return;
         int y = PANEL_Y + 50;
-        for (String line : wrapDescription(description.getString())) {
-            graphics.text(this.font, Component.literal(line), PANEL_X + PANEL_PADDING, y, 0xFF606060, false);
-            y += 10;
+
+        if (containsHangul(description.getString())) {
+            for (String line : wrapHangulDescription(description.getString())) {
+                graphics.text(this.font, Component.literal(line), PANEL_X + PANEL_PADDING, y, 0xFF606060, false);
+                y += 10;
+            }
+        } else {
+            for (var line : this.font.split(description, DESCRIPTION_WIDTH)) {
+                graphics.text(this.font, line, PANEL_X + PANEL_PADDING, y, 0xFF606060, false);
+                y += 10;
+            }
         }
     }
 
-    private List<String> wrapDescription(String text) {
+    private List<String> wrapHangulDescription(String text) {
         List<String> lines = new ArrayList<>();
-        boolean hyphenate = !containsHangul(text);
         int start = 0;
 
         while (start < text.length()) {
@@ -107,19 +114,8 @@ public final class TractorInventoryScreen extends AbstractContainerScreen<Tracto
                 break;
             }
 
-            int breakPos = end;
-            if (breakPos == start) breakPos = Math.min(start + 1, text.length());
-            boolean splitWord = hyphenate && breakPos > start && breakPos < text.length() && !Character.isWhitespace(text.charAt(breakPos - 1)) && !Character.isWhitespace(text.charAt(breakPos));
-
-            if (splitWord) {
-                while (breakPos > start && this.font.width(text.substring(start, breakPos).stripTrailing() + "-") > DESCRIPTION_WIDTH) breakPos--;
-                if (breakPos == start) breakPos = Math.min(start + 1, text.length());
-            }
-
-            String line = text.substring(start, breakPos).stripTrailing();
-            boolean actualSplitWord = hyphenate && breakPos > start && breakPos < text.length() && !Character.isWhitespace(text.charAt(breakPos - 1)) && !Character.isWhitespace(text.charAt(breakPos));
-            if (actualSplitWord) line += "-";
-            lines.add(line);
+            int breakPos = Math.max(start + 1, end);
+            lines.add(text.substring(start, breakPos).stripTrailing());
             start = breakPos;
         }
 
