@@ -28,6 +28,10 @@ public final class TractorHarvester {
     private TractorHarvester() {}
 
     public static void harvest(TractorEntity tractor, ServerLevel level) {
+        TractorAttachmentHandler.apply(tractor, level);
+    }
+
+    static void harvestCrops(TractorEntity tractor, ServerLevel level) {
         AABB box = tractor.getBoundingBox();
 
         int minX = Mth.floor(box.minX + HORIZONTAL_INSET);
