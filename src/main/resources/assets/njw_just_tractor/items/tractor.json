@@ -1,9 +1,12 @@
 {
   "model": {
-    "type": "minecraft:special",
-    "base": "njw_just_tractor:item/tractor",
-    "model": {
-      "type": "njw_just_tractor:tractor"
-    }
+    "type": "minecraft:model",
+    "model": "minecraft:item/egg",
+    "tints": [
+      {
+        "type": "minecraft:constant",
+        "value": 14056996
+      }
+    ]
   }
 }

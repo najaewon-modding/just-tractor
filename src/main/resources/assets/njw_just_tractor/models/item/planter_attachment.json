@@ -1,6 +1,0 @@
-{
-  "parent": "minecraft:item/generated",
-  "textures": {
-    "layer0": "njw_just_tractor:item/planter_attachment"
-  }
-}
