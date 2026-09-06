@@ -6,6 +6,8 @@ import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.item.ItemStack;
+import net.njw.justtractor.item.ModItems;
 import net.njw.justtractor.menu.TractorInventoryMenu;
 
 public final class TractorInventoryScreen extends AbstractContainerScreen<TractorInventoryMenu> {
@@ -24,9 +26,9 @@ public final class TractorInventoryScreen extends AbstractContainerScreen<Tracto
     private static final int SLOT_TEXTURE_Y = 17;
     private static final int SLOT_SIZE = 18;
     private static final int PANEL_X = 180;
-    private static final int PANEL_Y = 7;
+    private static final int PANEL_Y = 17;
     private static final int PANEL_WIDTH = 60;
-    private static final int PANEL_HEIGHT = 153;
+    private static final int PANEL_HEIGHT = 143;
     private static final int ATTACHMENT_SLOT_BACKGROUND_X = 200;
     private static final int ATTACHMENT_SLOT_BACKGROUND_Y = 30;
 
@@ -47,7 +49,8 @@ public final class TractorInventoryScreen extends AbstractContainerScreen<Tracto
         graphics.text(this.font, this.title, 8, 6, 0xFF404040, false);
         graphics.text(this.font, this.playerInventoryTitle, 8, 75, 0xFF404040, false);
         int attachmentTitleX = PANEL_X + (PANEL_WIDTH - this.font.width(ATTACHMENT_TITLE)) / 2;
-        graphics.text(this.font, ATTACHMENT_TITLE, attachmentTitleX, 14, 0xFF404040, false);
+        graphics.text(this.font, ATTACHMENT_TITLE, attachmentTitleX, 6, 0xFF404040, false);
+        drawAttachmentDescription(graphics);
     }
 
     private void blitExtendedSection(GuiGraphicsExtractor graphics, int x, int y, int textureY, int height) {
@@ -67,8 +70,26 @@ public final class TractorInventoryScreen extends AbstractContainerScreen<Tracto
         graphics.fill(left, top, left + PANEL_WIDTH, top + PANEL_HEIGHT, 0x10000000);
         graphics.outline(left, top, PANEL_WIDTH, PANEL_HEIGHT, 0xFF8B8B8B);
         graphics.blit(RenderPipelines.GUI_TEXTURED, CONTAINER_TEXTURE, this.leftPos + ATTACHMENT_SLOT_BACKGROUND_X, this.topPos + ATTACHMENT_SLOT_BACKGROUND_Y, SLOT_TEXTURE_X, SLOT_TEXTURE_Y, SLOT_SIZE, SLOT_SIZE, 256, 256);
-        graphics.fill(left + 6, top + 52, left + PANEL_WIDTH - 6, top + 53, 0xFFB0B0B0);
+        graphics.fill(left + 6, top + 42, left + PANEL_WIDTH - 6, top + 43, 0xFFB0B0B0);
         graphics.fill(left + 6, top + PANEL_HEIGHT - 9, left + 14, top + PANEL_HEIGHT - 8, 0xFFB0B0B0);
         graphics.fill(left + PANEL_WIDTH - 14, top + PANEL_HEIGHT - 9, left + PANEL_WIDTH - 6, top + PANEL_HEIGHT - 8, 0xFFB0B0B0);
+    }
+
+    private void drawAttachmentDescription(GuiGraphicsExtractor graphics) {
+        ItemStack stack = this.menu.getSlot(TractorInventoryMenu.ATTACHMENT_SLOT).getItem();
+        Component[] lines = getAttachmentDescription(stack);
+        if (lines.length == 0) return;
+        int y = PANEL_Y + 50;
+        for (Component line : lines) {
+            graphics.text(this.font, line, PANEL_X + 6, y, 0xFF606060, false);
+            y += 10;
+        }
+    }
+
+    private static Component[] getAttachmentDescription(ItemStack stack) {
+        if (stack.getItem() == ModItems.HARVESTER_ATTACHMENT.get()) return new Component[]{Component.translatable("attachment.njw_just_tractor.harvester.description.1"), Component.translatable("attachment.njw_just_tractor.harvester.description.2"), Component.translatable("attachment.njw_just_tractor.harvester.description.3")};
+        if (stack.getItem() == ModItems.TILLER_ATTACHMENT.get()) return new Component[]{Component.translatable("attachment.njw_just_tractor.tiller.description.1"), Component.translatable("attachment.njw_just_tractor.tiller.description.2")};
+        if (stack.getItem() == ModItems.PLANTER_ATTACHMENT.get()) return new Component[]{Component.translatable("attachment.njw_just_tractor.planter.description.1"), Component.translatable("attachment.njw_just_tractor.planter.description.2")};
+        return new Component[0];
     }
 }
