@@ -115,3 +115,7 @@ Just Tractor는 복잡한 완전 자동 농업 시스템을 추가하는 모드�
 
 * Minecraft: 26.1.2
 * NeoForge: 26.1.2.97
+
+## License
+
+MIT
